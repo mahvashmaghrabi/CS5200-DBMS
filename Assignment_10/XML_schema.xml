@@ -1,0 +1,38 @@
+<xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="log">
+    <xs:complexType>
+      <xs:choice maxOccurs="unbounded" minOccurs="0">
+        <xs:element name="page">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element type="xs:byte" name="pid"/>
+              <xs:element type="xs:anyURI" name="url"/>
+            </xs:sequence>
+            <xs:attribute type="xs:byte" name="Id"/>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="visit">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element type="xs:byte" name="tid"/>
+              <xs:element type="xs:date" name="vdate"/>
+              <xs:element type="xs:time" name="vtime"/>
+            </xs:sequence>
+            <xs:attribute type="xs:byte" name="Id"/>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="visitor">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element type="xs:byte" name="vid" minOccurs="0"/>
+              <xs:element type="xs:string" name="ip" minOccurs="0"/>
+              <xs:element type="xs:short" name="pid" minOccurs="0"/>
+              <xs:element type="xs:anyURI" name="url" minOccurs="0"/>
+            </xs:sequence>
+            <xs:attribute type="xs:byte" name="Id" use="optional"/>
+          </xs:complexType>
+        </xs:element>
+      </xs:choice>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

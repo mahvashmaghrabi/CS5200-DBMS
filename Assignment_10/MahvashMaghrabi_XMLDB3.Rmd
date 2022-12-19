@@ -1,0 +1,135 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# Installing and loading the required packages
+```{r}
+library(XML)
+library(RSQLite)
+library(DBI)
+library(knitr)
+library("methods")
+```
+
+# Reading the XML file in R
+```{r}
+readXML <- xmlParse("/Users/mahvashmaghrabi/Downloads/Books-v3.xml")
+print(readXML)
+```
+# Q1) UML diagram that satisfies the Boycee Codd Normal Form
+```{r}
+knitr::include_graphics("https://i.imgur.com/rM5oMXl.jpeg")
+```
+# Q2) Creating and Connecting to a new SQLite database for the books data in the XML file
+```{r}
+newdb <- "bookBank.db"
+conn <- dbConnect(RSQLite::SQLite(), paste0(newdb))
+```
+
+# Creating a new table Book in the database created
+```{sql connection=conn}
+CREATE TABLE Book( 
+  book_id NUMBER PRIMARY KEY NOT NULL,
+  author TEXT,
+  title TEXT,
+  genre TEXT,
+  price NUMBER,
+  publish_date DATE,
+  description TEXT
+)
+```
+
+# Q3) Loading the XML data from the file into R data frames.
+```{r}
+log <- xmlRoot(ReadXML)
+size <- xmlSize(log)
+```
+
+# Processing Node Lists
+```{r}
+authorData <- xpathApply(log, "//author")
+titleData <- xpathApply(log, "//title")
+genreData <- xpathApply(log, "//genre")
+priceData <- xpathApply(log, "//price")
+dateData <- xpathApply(log, "//publish_date")
+descriptionData <- xpathApply(log, "//description")
+
+```
+
+# Dataframes for storing the data
+```{r}
+catalog.df <- data.frame(book_id = vector (mode = "character", len = size),
+    author = vector (mode = "character", len = size),
+    title = vector (mode = "character",len = size),
+    genre = vector (mode = "character",len = size),
+    price = vector (mode = "integer", len = size),
+    publish_date = vector (mode = "character",len = size),
+    description = vector (mode = "character",len = size))
+```
+
+# Iterating through the elements in XML
+```{r}
+for (book in 1:size)
+{
+  
+  bk <- log[[book]]
+  bkAttribute <- xmlAttrs(bk)
+  book_idAttribute <- bkAttribute[1]
+  
+  catalog.df$book_id[book] <- book_idAttribute
+  catalog.df$author[book] <- xmlValue(authorData[[book]])
+  catalog.df$title[book] <- xmlValue(titleData[[book]])
+  catalog.df$genre[book] <- xmlValue(genreData[[book]])
+  catalog.df$price[book] <- as.numeric ( xmlValue(priceData[[book]]) )
+  catalog.df$publish_date[book] <- xmlValue(dateData[[book]])
+  catalog.df$description[book] <- xmlValue(descriptionData[[book]])
+  
+}
+print(catalog.df)
+```
+#Q4) Saving the dataframes to the data table
+```{r}
+dbWriteTable(conn, "Book", catalog.df, overwrite = T)
+```
+
+# Simple SELECT query to check the database
+```{sql connection=conn}
+SELECT * FROM Book
+```
+#Q5)SQL Queries
+# A) What is the number of genres have at least three books?
+```{sql connection=conn}
+SELECT COUNT(DISTINCT genre) as "TOTAL GENRES" 
+FROM Book 
+WHERE genre 
+IN (SELECT genre FROM Book GROUP BY genre HAVING COUNT(genre) > 3)
+```
+
+# B) What is the oldest year in which a publication was published?
+```{sql connection=conn}
+SELECT substr(publish_date, 1, 4) AS "OLDEST YEAR" 
+FROM Book 
+ORDER BY publish_date ASC LIMIT 1
+```
+
+# C) Find the number of books and average price for each genre.
+```{sql connection=conn}
+SELECT genre AS "GENRE", COUNT(DISTINCT book_id) AS "NUMBER OF BOOKS", AVG(price) AS "AVERAGE PRICE"
+FROM Book 
+GROUP BY genre
+```
+
+# D)List the title and author of all books that are less than 0.8*AVG or more than 1.2*AVG, where AVG is the average price of all books.
+
+```{sql connection=conn}
+SELECT title AS "TITLE", author AS "AUTHOR"
+From Book 
+WHERE price < (.8 * (SELECT AVG(price) FROM Book)) OR price > (1.2 * (SELECT AVG(price) FROM Book))
+
+```
+# Disconnect the database
+```{r}
+dbDisconnect(conn)
+```
+

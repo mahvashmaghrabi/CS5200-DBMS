@@ -1,0 +1,123 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r}
+library(RSQLite)
+dbcon <- dbConnect(RSQLite::SQLite(), "/Users/mahvashmaghrabi/Downloads/MediaDB.db")
+```
+
+
+```{sql connection=dbcon}
+--QUESTION 1 :  What are the last name, city, and state of all customers who made at least one purchase and live in Brazil?
+
+SELECT DISTINCT customers.LastName, customers.City, customers.State, customers.Country
+FROM customers
+JOIN invoices
+ON customers.Customerid = invoices.Customerid AND Country="Brazil";
+```
+
+
+```{sql connection=dbcon}
+--QUESTION 2 : What are the titles of each album and the number of tracks on each album?
+
+SELECT DISTINCT (title),COUNT(*) AS TotalTracks
+FROM albums 
+JOIN tracks 
+WHERE albums.albumid=tracks.albumid 
+GROUP BY title;
+
+
+```
+
+```{sql connection=dbcon}
+--QUESTION 3 : List the number of tracks by media type.
+
+select distinct media_types.Name, count(*) as Nooftracks 
+from media_types
+join tracks 
+where media_types.MediaTypeId=tracks.MediaTypeId 
+group by media_types.Name;
+
+
+```
+
+```{sql connection=dbcon}
+--QUESTION 4 : What is the average age of the employees? Use SQL to round the result to one digit of precision
+
+SELECT ROUND(AVG(strftime('%Y','now')- strftime('%Y',BirthDate)),1) AS AvgAge
+FROM Employees;
+
+```
+
+```{sql connection=dbcon}
+--QUESTION 5 : What are the total number of unique customers for each US state (e.g., MA, CT, etc.), ordered alphabetically by state, who made at least one purchase
+
+SELECT COUNT(DISTINCT customers.Customerid) AS NoOfCustomers,customers.Country,customers.State
+FROM customers
+JOIN invoices 
+ON customers.Customerid = invoices.Customerid 
+WHERE customers.Country="USA"
+GROUP BY State;
+
+```
+
+
+```{sql connection=dbcon}
+--QUESTION 6 : How many customers never made a purchase, i.e., they appear in the customers table but not in the invoices table
+
+SELECT COUNT(Customerid) AS NoOfCustomers
+FROM customers
+WHERE Customerid NOT IN
+(SELECT Customerid FROM invoices);
+
+```
+
+```{sql connection=dbcon}
+--QUESTION 7 : How many albums contain the substring "symphony" in the album title?
+
+SELECT COUNT(albums.Title) as NoOfAlbums
+FROM albums
+WHERE title LIKE '%symphony%'
+```
+
+```{sql connection=dbcon}
+--QUESTION 8 : What is the total "time" of all tracks per artist, i.e., add up the "Milliseconds" column in tracks? Display the artist's name and the time in hours rounded to two decimals.
+
+SELECT DISTINCT artists.Name,ROUND((SUM(cast(tracks.Milliseconds AS float))/3600000),2) AS TotalTime
+from artists,tracks,albums
+where artists.ArtistId=albums.ArtistId and albums.AlbumId=tracks.AlbumId Group by artists.ArtistId having min(tracks.trackID)>=1
+```
+
+```{sql connection=dbcon}
+--QUESTION 9 : Which artist(s) published the least number tracks, regardless of type and format? List the artist(s) name(s).
+
+SELECT artists.Name
+FROM tracks
+JOIN albums
+ON tracks.Albumid = albums.Albumid
+JOIN artists
+ON albums.Artistid = artists.Artistid
+GROUP BY artists.Artistid, artists.Name
+HAVING COUNT(tracks.Trackid) = (SELECT MIN(n.NoOfTracks)
+FROM
+(SELECT COUNT(tracks.Trackid) AS NoOfTracks
+FROM tracks
+JOIN albums
+ON tracks.Albumid = albums.Albumid
+GROUP BY albums.Artistid) AS n);
+```
+
+```{sql connection=dbcon}
+--QUESTION 10 : Which artists have composed tracks in more than three different genres? List the artists name and the number of distinct genres they have compositions in.
+
+SELECT artists.name,count(DISTINCT(tracks.genreId)) AS NoOfGeneres 
+FROM artists,albums,tracks 
+WHERE artists.artistid=albums.artistid AND albums.albumid=tracks.albumid
+GROUP BY artists.Name 
+HAVING count(DISTINCT tracks.genreid)>3;
+
+```
+
+
+

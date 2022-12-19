@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE log [
+<!ELEMENT log (Page, Visit, Visitor)>
+<!ATTLIST page Id CDATA #REQUIRED>
+<!ELEMENT page (pid, url)>
+<!ELEMENT pid (#PCDATA)>
+<!ELEMENT url (#PCDATA)>
+
+<!ELEMENT visit (tid, vdate, vtime)>
+<!ATTLIST visit Id CDATA #REQUIRED>
+<!ELEMENT tid (#PCDATA)>
+<!ELEMENT vdate (#PCDATA)>
+<!ELEMENT vtime (#PCDATA)>
+
+<!ELEMENT visitor (vid, ip)>
+<!ATTLIST visitor Id CDATA #REQUIRED>
+<!ELEMENT vid (#PCDATA)>
+<!ELEMENT ip (#PCDATA)>
+]>
+
+<log>
+    <page Id='10'>
+        <pid>100</pid>
+        <url>http://artificium.us/lessons/l101.html</url>
+    </page>
+
+    <visit Id='10'>
+        <tid>1</tid>
+        <vdate>2021-09-30</vdate>
+        <vtime>20:03:44</vtime>
+    </visit>
+    
+    <visitor Id='10'>
+        <vid>101</vid>
+        <ip>165.11.33.45</ip>
+    </visitor>
+    
+    <page Id='20'>
+        <pid>120</pid>
+        <url>http://articificum.us/courses/cs1100.html</url>
+    </page>
+
+    <visit Id='20'>
+        <tid>2</tid>
+        <vdate>2021-08-31</vdate>
+        <vtime>08:03:34</vtime>
+    </visit>
+    
+    <visitor Id='20'>
+        <vid>102</vid>
+        <ip>165.11.33.22</ip>
+    </visitor>
+
+    <page Id='30'>
+        <pid>125</pid>
+        <url>http://artificium.us/lessons/list-stacks.html</url>
+    </page>
+
+    <visit Id='30'>
+        <tid>3</tid>
+        <vdate>2021-10-28</vdate>
+        <vtime>07:02:11</vtime>
+    </visit>
+    
+    <visitor Id='30'>
+        <vid>103</vid>
+        <ip>165.11.33.55</ip>
+    </visitor>
+    
+</log>

@@ -1,0 +1,338 @@
+---
+title: "R Notebook"
+output: html_notebook
+discussed with : Suteja Bhimashankar Patil
+---
+# Connecting to the sakila database in SQLite
+```{r}
+library(RSQLite)
+dbcon <- dbConnect(RSQLite::SQLite(), "/Users/mahvashmaghrabi/Downloads/sakila.db")
+```
+
+# Connecting to the sakila databsae in MySQL
+```{r}
+library(RMySQL)
+mydb <- dbConnect( drv = RMySQL::MySQL(), user='root', password='mahvash14', dbname='sakila', host='localhost')
+
+```
+
+#Checking all the built in indexes as well as the ones that have been created in SQLite
+```{sql connection=dbcon}
+SELECT
+   `type`, 
+   `name`, 
+   `tbl_name`, 
+   `sql`
+  FROM sqlite_master
+WHERE `type` = 'index';
+
+```
+
+#Checking all the built in indexes as well as the ones that have been created in MySQL
+```{sql connection=mydb}
+SELECT DISTINCT TABLE_NAME, INDEX_NAME FROM INFORMATION_SCHEMA. STATISTICS WHERE TABLE_SCHEMA = 'sakila';
+
+```
+
+QUERY 1 -- SQLite
+
+#Dropping index RentalDetails if it exists
+```{sql connection=dbcon}
+DROP INDEX Rental Details;
+
+```
+
+# Query on a single table with a WHERE clause that is not the primary key without an index
+```{sql connection=dbcon}
+EXPLAIN QUERY PLAN SELECT * FROM FILM 
+WHERE rental_duration < 5
+
+```
+
+#Creating an index named RentalDetails on column rental_duration
+```{sql connection=dbcon}
+CREATE INDEX RentalDetails
+ON FILM (rental_duration);
+
+```
+
+# Query on a single table with a WHERE clause that is not the primary key but with an index
+```{sql connection=dbcon}
+EXPLAIN QUERY PLAN SELECT * FROM FILM 
+WHERE rental_duration < 5
+
+```
+
+QUERY 1 -- MySQL
+```{sql connection=mydb}
+DROP INDEX RentalDetails ON FILM
+
+```
+
+```{sql connection=mydb}
+EXPLAIN SELECT * FROM FILM 
+WHERE rental_duration < 5
+
+```
+
+#Creating an index named RentalDetails on columns rental_duration and rental_rate in MySQL
+```{sql connection=mydb}
+CREATE INDEX RentalDetails
+ON FILM (rental_duration)
+
+```
+
+# Query on a single table with a WHERE clause that is not the primary key but with an index
+```{sql connection=mydb}
+EXPLAIN SELECT * FROM FILM 
+WHERE rental_duration < 5
+
+```
+
+#OBSERVATION OF QUERY 1 in SQLite
+Query without an index gives rental_duration not in an order and all the numbers are not arranged in a particular ascending or descending order
+Whereas, the same query after using the index 'RentalDetails' gives the output of the rental_duration in a particular order. 
+Explain Query Plan shows in the detail column that it scans the entire Film table but after the creation of index the same query uses the index and instead of the scan keyword uses the search keyword and mentions the index name that is being used. 
+
+#OBSERVATION OF QUERY 1 in MySQL
+In MySQL (EXPALIN QUERY PLAN DOES NOT WORK AS IT HAS A DIFFERENT SYNTAX SO WE JUST USE EXPLAIN) EXPLAIN shows us that without an index the entire FILM table is getting scanned and the possible keys are not available but after using the index the possible keys mention the name of the index that is being used and the key column tells us the name of the index being used so the index 'RentalDetails' is not being used while performing the same query in MySQL. The keyword SIMPLE basically means that only one table is being used to perform the SQL query.
+
+========================================================================
+
+Query 2 -- SQLite
+#Query with a join on at least three tables (no secondary indexes; no where clause other than join clause)
+
+#Joining 3 tables STORE,STAFF and PAYMENT
+```{sql connection=dbcon}
+EXPLAIN QUERY PLAN SELECT S.STORE_ID, ST.FIRST_NAME, P.AMOUNT
+FROM STORE S
+INNER JOIN STAFF ST
+on S.STORE_ID = ST.STORE_ID
+INNER JOIN PAYMENT P 
+on P.STAFF_ID = ST.STAFF_ID
+
+```
+#Dropping index if exists
+```{sql connection=dbcon}
+DROP INDEX PaymentDetails
+
+```
+
+#Creating index on Payment table
+```{sql connection=dbcon}
+CREATE INDEX PaymentDetails
+ON PAYMENT(PAYMENT_ID,AMOUNT)
+
+```
+
+#Dropping index if exists
+```{sql connection=dbcon}
+DROP INDEX StaffDetails
+
+```
+
+#Creating index on Staff table
+```{sql connection=dbcon}
+CREATE INDEX StaffDetails
+ON STAFF(STAFF_ID,STORE_ID,FIRST_NAME)
+
+```
+
+#Same query after creating an index
+```{sql connection=dbcon}
+EXPLAIN QUERY PLAN SELECT S.STORE_ID, ST.FIRST_NAME, P.AMOUNT
+FROM STORE S
+INNER JOIN STAFF ST
+on S.STORE_ID = ST.STORE_ID
+INNER JOIN PAYMENT P 
+on P.STAFF_ID = ST.STAFF_ID
+
+```
+
+QUERY2 - MySQL
+# Same query 2 in MySQL before creating an index
+```{sql connection=mydb}
+EXPLAIN SELECT S.STORE_ID, ST.FIRST_NAME, P.AMOUNT
+FROM STORE S
+INNER JOIN STAFF ST
+on S.STORE_ID = ST.STORE_ID
+INNER JOIN PAYMENT P 
+on P.STAFF_ID = ST.STAFF_ID
+
+```
+#Dropping index if exists
+```{sql connection=mydb}
+DROP INDEX PaymentDetails ON PAYMENT
+
+```
+
+#Creating index on Payment table
+```{sql connection=mydb}
+CREATE INDEX PaymentDetails
+ON PAYMENT(PAYMENT_ID,AMOUNT)
+
+```
+
+#Dropping index if exists
+```{sql connection=mydb}
+DROP INDEX StaffDetails ON STAFF
+
+```
+
+#Creating index on Staff table
+```{sql connection=mydb}
+CREATE INDEX StaffDetails
+ON STAFF(STAFF_ID,STORE_ID,FIRST_NAME)
+
+```
+
+# Same query 2 in MySQL after creating an index
+```{sql connection=mydb}
+EXPLAIN SELECT S.STORE_ID, ST.FIRST_NAME, P.AMOUNT
+FROM STORE S
+INNER JOIN STAFF ST
+on S.STORE_ID = ST.STORE_ID
+INNER JOIN PAYMENT P 
+on P.STAFF_ID = ST.STAFF_ID
+```
+#OBSERVATION OF QUERY 2 IN SQLite
+In the second query three tables are being joined and two indexes have been created in the related fields. But SQLite does not use the built in indexes and directly scans through the tables. I think the reason for not using the index is that the SQL server estimated that the cost of performing a search on the index was way more expensive than performing a full table scan or there can also be a possibility that the range is wide
+
+#OBSERVATION OF QUERY 2 IN MySQL
+It uses the primary index that is already built in the database rather than using the ones created by me. Any column in creating table statement declared as PRIMARY KEY, KEY, UNIQUE or INDEX is indexed automatically by MySQL hence it has a greater number of pre created indexes than the ones in SQLite.It uses the built in primary key index 'idx_unique_manager'for this query.
+
+========================================================================
+
+QUERY 3 - SQLite
+#query on a single table with group by having a where clause that involves only the primary key column
+
+```{sql connection=dbcon}
+DROP INDEX FilmDetails;
+
+```
+
+```{sql connection=dbcon}
+EXPLAIN QUERY PLAN SELECT COUNT(FILM_ID),RATING
+FROM FILM
+WHERE FILM_ID < 10
+GROUP BY RATING
+
+
+```
+
+```{sql connection=dbcon}
+CREATE INDEX FilmDetails
+ON FILM(FILM_ID, RATING)
+```
+
+
+```{sql connection=dbcon}
+EXPLAIN QUERY PLAN SELECT COUNT(FILM_ID),RATING
+FROM FILM
+WHERE FILM_ID < 10
+GROUP BY RATING
+
+```
+
+QUERY 3 - MySQL
+
+```{sql connection=mydb}
+DROP INDEX FilmDetails ON FILM;
+
+```
+
+```{sql connection=mydb}
+EXPLAIN SELECT COUNT(FILM_ID),RATING
+FROM FILM
+WHERE FILM_ID < 10
+GROUP BY RATING
+
+
+```
+
+```{sql connection=mydb}
+CREATE INDEX FilmDetails
+ON FILM(FILM_ID, RATING)
+```
+
+
+```{sql connection=mydb}
+EXPLAIN SELECT COUNT(FILM_ID),RATING
+FROM FILM
+WHERE FILM_ID < 10
+GROUP BY RATING
+
+```
+
+#OBSERVATION OF QUERY 3 IN SQLite
+It uses the index 'FilmDetails' as a covering index. The FilmDetails index has the columns film_id and rating. It uses a covering index which is used when an index contains all the columns needed to satisfy a query.
+
+#OBSERVATION OF QUERY 3 IN MySQL
+The MySQL index uses the FilmDetails index . It shows possible keys as the primary key as well as the created index but it uses only the index that was created and not the primary key.
+
+========================================================================
+
+QUERY 4 - SQLite
+#one additional experiment of your choice: any query, any index use
+```{sql connection=dbcon}
+DROP INDEX FilmDescription
+
+```
+
+```{sql connection=dbcon}
+EXPLAIN QUERY PLAN SELECT TITLE,LENGTH
+FROM FILM WHERE LENGTH <= 100
+
+```
+
+```{sql connection=dbcon}
+CREATE INDEX FilmDescription
+ON FILM(TITLE,LENGTH)
+
+```
+
+```{sql connection=dbcon}
+EXPLAIN QUERY PLAN SELECT TITLE,LENGTH
+FROM FILM WHERE LENGTH <= 100
+
+```
+
+QUERY 4 - MySQL
+```{sql connection=mydb}
+DROP INDEX FilmDescription ON FILM
+
+```
+
+```{sql connection=mydb}
+EXPLAIN SELECT TITLE,LENGTH
+FROM FILM WHERE LENGTH <= 100
+
+```
+
+```{sql connection=mydb}
+CREATE INDEX FilmDescription
+ON FILM(TITLE,LENGTH)
+
+```
+
+```{sql connection=mydb}
+EXPLAIN SELECT TITLE,LENGTH
+FROM FILM WHERE LENGTH <= 100
+
+```
+
+#OBSERVATION OF QUERY 4 IN SQLite
+The index 'FilmDescription' created is being used as a covering index as it contains all the columns required by the query.
+
+#OBSERVATION OF QUERY 4 IN MySQL
+The index is also being used in the MySQL query. It mentions in the key column the name of the index being used. Also mentions in the Extra column that an index is being used.
+
+#Disconnecting the SQLite connection
+```{r}
+dbDisconnect(dbcon)
+```
+
+#Disconnecting the MySQL connection
+```{r}
+dbDisconnect(mydb)
+```

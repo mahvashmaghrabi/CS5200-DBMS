@@ -1,0 +1,53 @@
+---
+title: "R Notebook"
+output: html_notebook
+Collaborated with : Suteja Bhimashankar Patil
+---
+
+```{r}
+library(sqldf)
+```
+
+```{r}
+dbcon <- dbConnect(RSQLite::SQLite(), "/Users/mahvashmaghrabi/Downloads/MediaDB.db")
+```
+
+#Question 1
+```{r}
+rs <- dbGetQuery(dbcon, "SELECT * FROM invoice_items")
+print(rs)
+rs["ExtPrice"]<- rs$UnitPrice*rs$Quantity
+print(rs)
+avg_ext_price <- sqldf("SELECT ROUND((AVG(ExtPrice)),2) AS Avg_Amt FROM rs")
+avg_ext_price
+```
+
+#Question 2
+```{r}
+query_2 <- sqldf("SELECT InvoiceID, SUM(ExtPrice) as Total_Amt,SUM(Quantity) AS No_of_Items FROM rs GROUP BY InvoiceId")
+sqldf("SELECT * FROM query_2")
+```
+
+# Question 3
+```{r}
+plot(query_2$No_of_Items,query_2$Total_Amt,main="Scatterplot",xlab="Total Items",ylab="Total price")
+```
+
+# Question 4
+```{r}
+query_2 <- sqldf(c("ALTER TABLE query_2 ADD column DiscPrice numeric","SELECT * FROM main.query_2"))
+query_2 <- sqldf(c("UPDATE query_2 SET DiscPrice = ROUND((Total_Amt*0.9),2) WHERE No_of_Items>5","SELECT * FROM main.query_2"))
+query_2 <- sqldf(c("UPDATE query_2 SET DiscPrice = ROUND(Total_Amt,2) WHERE No_of_Items<=5","SELECT * FROM main.query_2"))
+sqldf("SELECT * FROM query_2")
+
+```
+
+#Question 5
+```{r}
+sqldf("SELECT * FROM query_2 LIMIT 20 ")
+```
+
+
+```{r}
+dbDisconnect(dbcon)
+```

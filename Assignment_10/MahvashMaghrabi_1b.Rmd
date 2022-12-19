@@ -1,0 +1,55 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# Installing and loading the necessary packages
+```{r}
+library(XML)
+library(methods)
+```
+
+# Reading the XML file into R
+```{r}
+ReadXML <- xmlParse(file = "/Users/mahvashmaghrabi/Desktop/XMLFile.xml")
+```
+
+# Printing the XML file
+```{r}
+print(ReadXML)
+```
+
+# Loading the necessary package
+```{r}
+library(xml2)
+```
+
+# Choosing the XML file that needs to be validated
+```{r}
+XMLfile <- xml2::read_xml(file.choose(""))
+
+```
+
+# Choosing the XML schema against which the XML file will be validated
+```{r}
+XMLschema <- xml2::read_xml(file.choose())
+```
+
+# Validating the XML file and checking for errors
+```{r}
+xml2::xml_validate(XMLfile,XMLschema)
+validation <- xml2::xml_validate(XMLfile,XMLschema)
+```
+
+# Printing the errors if any
+```{r}
+print(attr(validation,"errors"))
+```
+
+# XPath expression to find the number of visits to the page 120
+```{r}
+Xpath <- "count(//log//visit[@Id=20])"
+Visits <- xpathApply(ReadXML, Xpath, xmlValue)
+print(paste("Number of visits to the page 120 :", Visits))
+```
+

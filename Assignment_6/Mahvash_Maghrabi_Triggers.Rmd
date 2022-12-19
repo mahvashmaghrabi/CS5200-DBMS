@@ -1,0 +1,196 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(DBI)
+fpath = "/Users/mahvashmaghrabi/DBMS/Databases"
+dbfile ="committeeDB.sqlite"
+
+dbcon <- dbConnect(RSQLite::SQLite(), paste0(fpath,dbfile))
+```
+
+```{sql connection=dbcon}
+PRAGMA foreign_keys = ON
+
+```
+
+```{sql connection=dbcon}
+CREATE TABLE PublishingDetails(
+p_id NUMBER PRIMARY KEY NOT NULL,
+pub_date TEXT NOT NULL,
+noOfViewers NUMBER,
+accessGranted TEXT NOT NULL
+)
+
+```
+
+```{sql connection=dbcon}
+CREATE TABLE Module(
+num TEXT PRIMARY KEY NOT NULL,
+title TEXT,
+lengthInMin NUMBER,
+p_id NUMBER,
+FOREIGN KEY (p_id) REFERENCES PublishingDetails(p_id)
+)
+
+```
+
+
+```{sql connection=dbcon}
+CREATE TABLE Affiliation(
+aff_id NUMBER PRIMARY KEY NOT NULL,
+PT NUMBER NOT NULL,
+FT NUMBER NOT NULL,
+contract TEXT NOT NULL
+)
+
+```
+
+```{sql connection=dbcon}
+CREATE TABLE Authors(
+aid NUMBER PRIMARY KEY NOT NULL,
+name TEXT NOT NULL,
+email TEXT,
+aff_id NUMBER NOT NULL,
+FOREIGN KEY (aff_id) REFERENCES Affiliation(aff_id)
+)
+
+```
+
+```{sql connection=dbcon}
+INSERT INTO PublishingDetails(p_id,pub_date,noOfViewers,accessGranted) VALUES
+(1,"10 January 2019",100,"Yes"),
+(2,"11 February 2020",150,"Yes"),
+(3,"12 March 2020",160,"Yes"),
+(4,"13 April 2021",170,"Yes"),
+(5,"14 May 2022",180,"Yes");
+
+```
+
+```{sql connection=dbcon}
+SELECT * FROM PublishingDetails
+
+```
+
+
+```{sql connection=dbcon}
+INSERT INTO Module (num,title,lengthInMin,p_id) VALUES
+(100,"Module 1",120,1),
+(200,"Module 2",130,2),
+(300,"Module 3",140,3),
+(400,"Module 4",150,4),
+(500,"Module 5",160,5);
+
+```
+
+```{sql connection=dbcon}
+SELECT * FROM Module
+
+```
+
+```{sql connection=dbcon}
+INSERT INTO Affiliation (aff_id,PT,FT,contract) VALUES
+(10,123,1111,"ABC contract"),
+(20,456,2222,"DEF contract"),
+(30,789,3333,"GHI contract"),
+(40,101,4444,"JKL contract"),
+(50,121,5555,"MNO contract");
+
+```
+
+```{sql connection=dbcon}
+SELECT * FROM Affiliation
+
+```
+
+```{sql connection=dbcon}
+INSERT INTO Authors (aid,name,email,aff_id) VALUES
+(99,"John Hopkins","johnhopkins@gmail.com",10),
+(14,"Mary Ann","maryann@gmail.com",20),
+(15,"Enid Blyton","enidblyton@gmail.com",30),
+(19,"Shakespeare","shakespeare@gmail.com",40),
+(17,"J.K.Rowling","jkrowling@gmail.com",50);
+
+```
+
+```{sql connection=dbcon}
+SELECT * FROM Authors
+
+```
+#TRIGGER 1
+#DESCRIPTION : THIS IS AN UPDATE TRIGGER ON THE MODULE TABLE IT GETS FIRED WHEN ANY CHANGES ARE MADE TO THE MODULE TITLE. IT BUILDS AN AUDIT TRAIL AND SHOWS WHAT THE TITLE OF THE MODULE BEFORE THE UPDATE WAS AS WELL AS AFTER THE UPDATE IS. IT ALSO SHOWS THE TIME WHEN THE UPDATE OPERATION WAS PERFORMED.
+
+```{sql connection=dbcon}
+CREATE TABLE ModuleChanges (
+    num TEXT,
+    beforeTitle INT,
+    afterTitle INT,
+    changedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+```
+
+```{sql connection=dbcon}
+
+CREATE TRIGGER new_courses
+AFTER UPDATE
+ON Module FOR EACH ROW
+BEGIN
+  INSERT INTO ModuleChanges(num,beforeTitle, afterTitle)
+  VALUES(old.num, old.title, new.title);
+END 
+
+```
+
+```{sql connection=dbcon}
+UPDATE Module
+SET title = "Module 5.0"
+WHERE num=500;
+
+```
+
+```{sql connection=dbcon}
+SELECT * FROM ModuleChanges;
+
+```
+
+```{sql connection=dbcon}
+UPDATE Module
+SET title = "Module 5"
+WHERE num=500;
+```
+
+```{sql connection=dbcon}
+SELECT * FROM ModuleChanges;
+
+```
+
+# TRIGGER 2
+#DESCRIPTION : THIS IS A DML TRIGGER WHICH IS PERFORMED WHEN AN INSERT OPERATION IS APPLIED ON THE "AUTHORS" TABLE. IT FIRES A TRIGGER BEFORE INSERTING AN EMAIL ADDRESS THAT IS INVALID. THE FORMAT OF THE EMAIL ID IS GIVEN WITHIN THE TRIGGER IF IT DOES NOT FOLLOW THE FORMAT A TRIGGER IS FIRED WHICH GIVES THE INAVALID EMAIL ERROR.
+```{sql connection=dbcon}
+CREATE TRIGGER invalidMail
+BEFORE INSERT ON Authors
+BEGIN
+SELECT
+CASE
+WHEN New.email NOT LIKE '%_@__%._%' Then
+Raise(abort,'The Email Id entered is invalid')
+END;
+END;
+
+```
+
+```{sql connection=dbcon}
+INSERT INTO Authors
+VALUES(18,'Anne Frank','@gmail.com',60)
+
+
+```
+
+```{r}
+dbDisconnect(dbcon)
+```
+
+
