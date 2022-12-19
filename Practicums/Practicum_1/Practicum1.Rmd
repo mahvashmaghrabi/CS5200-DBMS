@@ -1,0 +1,501 @@
+---
+title: "R Notebook"
+output: html_notebook
+authors : Mahvash Maghrabi, Suteja Patil
+---
+
+#Installing all required packages
+```{r}
+library(RMySQL)
+library(sqldf)
+options(sqldf.driver = "SQLite")
+library(dplyr)
+library(ggplot2)
+```
+
+
+# Setting the DB Connection to the AWS instance
+```{r}
+# 2. Settings
+db_user <- 'admin'
+db_password <- 'Practicum5200$'
+db_name <- 'PracticumDB'
+db_host <- 'database-1.cobrvr2ibpoc.us-east-1.rds.amazonaws.com' # AWS Host
+db_port <- 3306
+
+# 3. Read data from db
+mydb <-  dbConnect(MySQL(), user = db_user, password = db_password,
+                 dbname = db_name, host = db_host, port = db_port)
+```
+
+
+# Checking the databases present
+```{sql connection=mydb}
+SHOW DATABASES
+
+```
+
+
+# Using the DB 
+```{sql connection=mydb}
+USE PracticumDB
+```
+
+
+# Dropping tables if already exists
+
+```{sql connection=mydb}
+DROP TABLE IF EXISTS incidents
+```
+
+```{sql connection=mydb}
+DROP TABLE IF EXISTS airports
+```
+
+```{sql connection=mydb}
+DROP TABLE IF EXISTS conditions
+```
+
+# Query - 1
+
+# Task 1 - B
+# Creating table airports that stores the aid, airportName, airportCode and state
+
+```{sql connection=mydb}
+CREATE TABLE airports(
+aid INTEGER NOT NULL AUTO_INCREMENT, 
+airportName TEXT NOT NULL, 
+airportCode TEXT , 
+state TEXT NOT NULL,
+PRIMARY KEY(aid)
+)
+
+```
+
+
+# Task 1 - D
+# Creating a lookup table conditions which stores the cid, condition and explanation
+
+```{sql connection=mydb}
+CREATE TABLE conditions(
+cid INTEGER NOT NULL AUTO_INCREMENT, 
+`condition` TEXT NOT NULL, 
+explanation TEXT,
+PRIMARY KEY(cid)
+)
+```
+
+
+# Task 1 - A
+# Creating table incidents that stores the rid, date, origin, airline, aircraft, flightPhase, altitude, conditions and warning
+# Task 1 - C
+# Linking the incidents and airports tables via the foreign key
+
+```{sql connection=mydb}
+CREATE TABLE incidents (
+rid INTEGER NOT NULL, 
+`date` DATE NOT NULL, 
+origin INTEGER, 
+airline TEXT NOT NULL, 
+aircraft TEXT NOT NULL, 
+flightPhase TEXT NOT NULL, 
+altitude INTEGER NOT NULL, 
+`conditions` INTEGER NOT NULL, 
+warning BOOLEAN NOT NULL,
+PRIMARY KEY(rid),
+FOREIGN KEY (origin) REFERENCES airports(aid),
+FOREIGN KEY (`conditions`) REFERENCES conditions(cid)
+)
+```
+
+
+
+# Query - 2
+# TASK 2
+# Loading the CSV file into R without filepath
+
+```{r}
+fn <- "BirdStrikesData-V2.csv"
+BirdStDF <- read.csv(fn, header = TRUE, stringsAsFactors = FALSE)
+```
+
+
+# Reading the CSV file
+```{r}
+BirdStDF
+```
+
+
+
+# Checking the unique flight phases
+```{r}
+unique(BirdStDF$flight_phase)
+```
+
+# Query -  1E Harmonize the flight phases
+# Task 1 - E
+# Harmonizing the flight phases to be one of: takeoff, landing, inflight or unknown.
+
+```{r}
+
+defaultW <- getOption("warn") 
+options(warn = -1) 
+
+
+
+BirdStDF<- sqldf(c("UPDATE
+    BirdStDF SET flight_phase=
+    CASE
+        WHEN flight_phase = 'Landing Roll' THEN 'Landing'
+        WHEN flight_phase = 'Approach' THEN 'Landing'
+        WHEN flight_phase = 'Climb' THEN 'Takeoff'
+        WHEN flight_phase = 'Take-off run' THEN 'Takeoff'
+        WHEN flight_phase = 'Descent' THEN 'Landing'
+        WHEN flight_phase = 'Taxi' THEN 'Ground'
+        WHEN flight_phase = 'Parked' THEN 'Ground'
+        WHEN flight_phase ='' THEN 'Unknown'
+    END; ", "SELECT * FROM BirdStDF"))
+
+options(warn = defaultW)
+
+
+BirdStDF
+```
+
+# Unique flight phases after harmonizing
+
+```{r}
+unique(BirdStDF$flight_phase)
+```
+
+## Query - 2 continued
+
+## Removing Military airline
+```{r}
+BirdStDF <- BirdStDF[!BirdStDF$airline == "MILITARY", ]
+```
+
+# linking to a "sentinel" airline  if there is no airline
+```{r}
+defaultW <- getOption("warn") 
+options(warn = -1) 
+
+BirdStDF <- sqldf(c(
+  "UPDATE BirdStDF SET airline = 'Unknown' WHERE airline = ''",
+  "SELECT * FROM BirdStDF"
+))
+
+options(warn = defaultW)
+```
+
+# linking to a "sentinel" airport  if there is no airport
+```{r}
+defaultW <- getOption("warn") 
+options(warn = -1) 
+
+BirdStDF <- sqldf(c(
+  "UPDATE BirdStDF SET airport = 'Unknown' WHERE airport = ''",
+  "SELECT * FROM BirdStDF"
+))
+options(warn = defaultW)
+
+BirdStDF
+```
+# Checking null values for each column
+```{r}
+
+sapply(BirdStDF, function(x) sum(is.na(x)))
+
+```
+
+
+# Creating a dataframe for conditions
+```{r}
+cond_df <-data.frame(condition= unique(BirdStDF$sky_conditions))
+cond_df <- cbind(cid = 1:nrow(cond_df), cond_df) 
+cond_df
+```
+
+# Creating a dataframe for airports
+
+```{r}
+airport_df <- data.frame(airportName=BirdStDF$airport,state=BirdStDF$origin)
+#removing duplicates
+airport_df <- airport_df %>% distinct()
+airport_df <- cbind(aid = 1:nrow(airport_df), airport_df) 
+airport_df
+```
+
+
+# Creating a incidents dataframe
+```{r}
+incidents_df <- data.frame(rid = BirdStDF$rid,`date` = BirdStDF$flight_date,
+                           origin = BirdStDF$airport,
+                           airline=BirdStDF$airline,aircraft=BirdStDF$aircraft,
+                           flightPhase=BirdStDF$flight_phase,
+                           altitude = BirdStDF$altitude_ft, 
+                           conditions = BirdStDF$sky_conditions, 
+                           warning=BirdStDF$pilot_warned_flag)
+incidents_df
+```
+
+
+# converting to datetime object
+```{r}
+
+incidents_df$`date` <- as.Date(incidents_df$`date`, format = "%m/%d/%Y")
+incidents_df
+```
+
+# Checking null values for each column
+```{r}
+
+sapply(incidents_df, function(x) sum(is.na(x)))
+
+```
+
+
+# Omitting the null values from incidents dataframe
+```{r}
+incidents_df <- na.omit(incidents_df) 
+incidents_df
+```
+
+# Checking null values for each column 
+```{r}
+
+sapply(incidents_df, function(x) sum(is.na(x)))
+
+```
+
+# Replacing the conditions in incidents table with unique id (cid) from conditions dataframe
+```{r}
+incidents_df <- sqldf("SELECT rid,`date`,airline,aircraft,origin,flightPhase,
+altitude, warning,cid
+AS conditions FROM incidents_df
+JOIN cond_df ON incidents_df.conditions = cond_df.condition")
+incidents_df
+```
+
+
+# Replacing the origin in incidents table with unique id (aid) from airports dataframe
+```{r}
+incidents_df <- sqldf("SELECT rid,`date`,airline,aircraft,aid AS origin,flightPhase,
+altitude, warning,conditions FROM incidents_df
+JOIN airport_df ON incidents_df.origin = airport_df.airportName")
+
+incidents_df
+```
+
+
+# Converting the warning column fields into to boolean 1(True) and 0(False)
+```{r}
+incidents_df$warning<-ifelse(incidents_df$warning=="Y",1,0)
+incidents_df
+```
+
+# Writing the conditions dataframe toconditions table
+
+```{r}
+dbWriteTable(mydb, "conditions", cond_df[1:nrow(cond_df),], row.names = FALSE, append = TRUE)
+```
+
+# Writing the airports dataframe to airports table
+
+```{r}
+dbWriteTable(mydb, "airports", airport_df[1:nrow(airport_df),], row.names = FALSE, append = TRUE)
+```
+
+# Writing the incidents dataframe to incidents table
+```{r}
+dbWriteTable(mydb, "incidents", incidents_df[1:nrow(incidents_df),], row.names = FALSE, append = TRUE)
+```
+
+```{sql connection=mydb}
+SELECT * FROM airports
+```
+
+```{sql connection=mydb}
+SELECT * FROM conditions
+```
+
+```{sql connection=mydb}
+SELECT * FROM incidents
+```
+## Query-3
+
+# TASK 3
+# Showing the first five rows of the incidents table to show that the loading of data worked 
+
+# Explanation - Loaded the CSV file into fn then we harmonized flight phases to landing, takeoff , unknown and ground.Removed military airline records and assumed business to be an airline . Wherever there were blank airport name and blank airline we added a sentinel value as unknown. Created separate data frames as cond_df, incidents_df, airport_df by matching respective columns from BirdStDf and executed the required queries. Finally we copied the three data frames to it’s respective tables.
+
+```{sql connection=mydb}
+SELECT * FROM incidents LIMIT 5
+
+```
+
+# Showing the first five rows of the airports table to show that the loading of data worked
+```{sql connection=mydb}
+SELECT * FROM airports LIMIT 5
+
+```
+
+# Showing the conditions table to show that the loading of data worked
+```{sql connection=mydb}
+SELECT * FROM conditions 
+
+```
+
+
+# Query 4
+
+# TASK 4 
+# Query to find the 10 airlines with the greatest number of incidents
+
+```{sql connection=mydb}
+SELECT airline FROM incidents GROUP BY airline HAVING COUNT(*) ORDER BY COUNT(*) DESC LIMIT 10
+```
+
+# Query 5
+# TASK 5
+# Query to find the flight phases that had an above average number of bird strike incidents
+```{sql connection=mydb}
+SELECT flightPhase, COUNT(*) AS birdStrikeIncidents FROM incidents
+GROUP BY flightPhase
+HAVING birdStrikeIncidents > (SELECT COUNT(*)/COUNT(DISTINCT flightPhase) AS avgBirdStrikes FROM incidents)
+```
+
+#  Query 6
+# TASK 6
+# Query to find the number of bird strike incidents by month
+
+```{sql connection=mydb}
+SELECT MONTHNAME(`date`) AS month, COUNT(*) AS BirdStrikeIncidents FROM incidents
+GROUP BY MONTHNAME(`date`)
+ORDER BY COUNT(*) DESC
+```
+# Answer to Task 6 - From the above results we can see that August had the highest number of bird strike incidents.
+
+## Query 7
+
+# TASK 7
+# Line chart visualizing the number of bird strikes incidents from the year 2005 to 2011.
+
+
+```{r}
+
+query <- "SELECT YEAR(`date`) as year, COUNT(*) as birdStrikeIncidents FROM incidents WHERE YEAR(`date`) BETWEEN 2005 AND 2011 GROUP BY year;"
+rs <- dbGetQuery(mydb, query)
+graph<-ggplot(rs,aes(x=year, y=birdStrikeIncidents)) + geom_line()
+graph + ggtitle("Bird Strike Incidents Between 2005 to 2011") + xlab("Year")+ ylab("Count of Bird Strike Incidents")
+
+
+```
+
+## Query 8
+
+# TASK 8
+# Creating a stored procedure that adds a new incident to the database
+
+```{sql connection=mydb}
+DROP PROCEDURE IF EXISTS addBirdStIncident
+```
+
+
+# Explanation - 
+# First we check if an id is present for airportName in airports table and count the number of id's associated with the airportName. If no id is associated, we need to insert the airportName and state as a new value in airports table so that an id gets associated with it which can be used as origin in incidents table
+
+# We also check if an id is present for condition in conditions table and count the number of id's associated with the condition. If no id is associated, we need to insert the condition as a new value in conditions table so that an id gets associated with it which can be used as condition in incidents table
+
+# We have used temporary variables to check if records are present in airports and conditions table.
+
+```{sql connection=mydb}
+CREATE PROCEDURE addBirdStIncident(
+IN Bid INT,
+IN Bdate DATE,
+IN BairportName TEXT,
+IN Bstate TEXT,
+IN Bairline TEXT,
+IN Baircraft TEXT,
+IN BflightPhase TEXT,
+IN Balititude INT,
+IN Bskycondition TEXT,
+IN Bpilotwarned BOOLEAN
+)
+BEGIN
+  DECLARE tempState INT;
+  DECLARE tempCond INT;
+  DECLARE taid INT;
+  DECLARE tcid INT;
+  
+  
+  SELECT COUNT(airports.aid) INTO tempState FROM airports WHERE airports.airportName=BairportName;
+  IF tempState=0 THEN
+    INSERT INTO airports(airportName,state) VALUES (BairportName,Bstate);
+  END IF;
+  
+  SELECT COUNT(conditions.cid) INTO tempCond FROM conditions WHERE 
+  conditions.`condition`=Bskycondition;
+  IF tempCond=0 THEN
+    INSERT INTO conditions(`condition`) VALUES (Bskycondition);
+  END IF;
+  
+  SELECT airports.aid  INTO taid FROM airports WHERE airports.airportName=BairportName AND airports.state=Bstate;
+  
+  SELECT conditions.cid INTO tcid FROM conditions  WHERE conditions.`condition`=Bskycondition;
+  
+  INSERT INTO incidents(rid,`date`,origin, airline,aircraft, flightPhase,
+  altitude, conditions, warning) VALUES (Bid, Bdate,taid,Bairline,
+  Baircraft, BflightPhase, Balititude,tcid, Bpilotwarned);
+  
+END;
+  
+```
+
+
+# Calling the stored procedure where we are adding a new Airport Name, State and also sky condition
+```{sql connection=mydb}
+CALL addBirdStIncident(10000,"2023-10-29","Delhi Airport","Delhi","Qatar Airlines","Airplane","Takeoff",10,"Sunny",0)
+```
+
+# Here we can see that since Sunny was not in record first, it is inserted into conditions table and later its cid is used in incident table
+
+```{sql connection=mydb}
+SELECT * FROM conditions
+```
+
+# Displaying the record inserted via stored procedure
+
+```{sql connection=mydb}
+SELECT * FROM incidents WHERE rid=10000
+```
+
+# Here we can see that since Delhi Airport was not in record first, it is inserted into airports table and later its aid is used in incident table as origin
+
+```{sql connection=mydb}
+SELECT * FROM airports WHERE airportName="Delhi Airport"
+```
+
+# Example 2 of stored procedure
+```{sql connection=mydb}
+CALL addBirdStIncident(10500,"2023-10-29","LAGUARDIA NY","New York","ABX AIR","Airplane","Landing",150,"Overcast",1)
+```
+# Calling the above stored procedure
+
+```{sql connection=mydb}
+SELECT * FROM incidents WHERE rid=10500
+```
+
+# No new entry is added to conditions table since Overcast was already a record in the table. So its cid is directly used has conditions in incidents table
+```{sql connection=mydb}
+SELECT * FROM conditions
+```
+
+# Disconnecting the DB connection
+
+```{r}
+dbDisconnect(mydb)
+```
+
+
+

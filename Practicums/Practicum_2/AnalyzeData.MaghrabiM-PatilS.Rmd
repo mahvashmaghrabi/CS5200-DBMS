@@ -1,0 +1,60 @@
+---
+title: "Practicum 2 Part 3"
+course: "CS5200 Fall 2022"
+author: "Mahvash Maghrabi and Suteja Patil"
+date : 12/08/2022
+---
+
+```{r}
+library(RMySQL)
+```
+
+## creating a MySQL connection
+```{r}
+con = dbConnect(RMySQL::MySQL(),
+                            host='localhost',
+                            port=3306,
+                            user='root',
+                            password='Sp24041993@')
+```
+
+```{sql connection=con}
+SHOW DATABASES
+```
+## Using PracticumDB from MySQL database created  in Part 2 of practicum
+```{sql connection=con}
+USE PracticumDB
+
+```
+
+
+```{sql connection=con}
+SELECT * FROM AuthorFacts
+```
+## Query 1 - Top ten authors with the most publications.
+
+```{sql connection=con}
+SELECT authID,LastName,ForeName,Total_Articles FROM AuthorFacts ORDER BY Total_Articles DESC LIMIT 10
+```
+
+
+
+```{sql connection=con}
+SELECT * FROM JournalFacts
+```
+```{sql connection=con}
+SELECT * FROM ArticleDimension
+```
+
+## Query - 2 -Number of articles per journal per year broken down by quarter
+
+```{sql connection=con}
+SELECT j.ISSN,j.Title,j.jyear AS YEAR,j.jquarter AS Quarter,COUNT(ar.id) AS Total_Articles FROM ArticleDimension ar,JournalFacts j WHERE ar.ISSN=j.ISSN GROUP BY j.ISSN,j.Title,j.jyear,j.jquarter ORDER BY j.jyear,j.jquarter ASC
+
+```
+## Disconnecting the database connection
+
+```{r}
+dbDisconnect(con)
+```
+
